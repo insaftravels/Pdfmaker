@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0b2545" />
+<title>ইনসাফ টিকেট রিব্র্যান্ড</title>
+
+<!-- ===================== ফায়ারবেজ কনফিগ =====================
+  নিচের ভ্যালুগুলো আপনার Firebase প্রজেক্টের দিয়ে বদলালে অ্যাপ সব ডিভাইসে সিঙ্ক হবে।
+  খালি/PASTE থাকলে অ্যাপ স্বয়ংক্রিয়ভাবে লোকাল মোডে (এই ব্রাউজারে সেভ) চলবে — কোনো লগইন লাগবে না।
+================================================================= -->
+<script>
+  const FIREBASE_CONFIG = {
+    apiKey: "PASTE_YOUR_API_KEY",
+    authDomain: "PASTE.firebaseapp.com",
+    projectId: "PASTE",
+    storageBucket: "PASTE.appspot.com",
+    messagingSenderId: "PASTE",
+    appId: "PASTE"
+  };
+</script>
+
+<!-- লাইব্রেরি (cdnjs) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-auth-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-firestore-compat.min.js"></script>
+
+<style>
+  :root{
+    --navy:#0b2545; --navy2:#13315c; --teal:#1f8a8c; --teal-soft:#e6f4f4;
+    --orange:#e08a2b; --ink:#1a2230; --muted:#6b7785; --line:#e3e8ef;
+    --bg:#f5f7fa; --white:#fff; --danger:#c0392b; --ok:#1f8a4d;
+    --radius:14px; --shadow:0 2px 10px rgba(11,37,69,.08);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0;}
+  body{
+    font-family:"Noto Sans Bengali","Segoe UI",system-ui,sans-serif;
+    background:var(--bg); color:var(--ink); padding-bottom:74px;
+    overscroll-behavior-y:contain;
+  }
+  /* Header */
+  .topbar{
+    position:sticky; top:0; z-index:30;
+    background:linear-gradient(135deg,var(--navy),var(--navy2));
+    color:#fff; padding:12px 16px; display:flex; align-items:center; gap:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
+  }
+  .topbar .brand{font-weight:700; font-size:16px; letter-spacing:.2px;}
+  .topbar .brand small{display:block; font-weight:400; font-size:11px; opacity:.8;}
+  .mode-chip{margin-left:auto; font-size:11px; background:rgba(255,255,255,.15);
+    padding:4px 9px; border-radius:20px;}
+
+  .wrap{max-width:640px; margin:0 auto; padding:14px;}
+  .card{background:var(--white); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:14px; margin-bottom:14px;}
+  .card h3{margin:0 0 10px; font-size:15px; color:var(--navy); display:flex; align-items:center; gap:7px;}
+  .card h3 .dot{width:8px; height:8px; border-radius:50%; background:var(--teal);}
+  label.fld{display:block; font-size:12.5px; color:var(--muted); margin:10px 0 4px;}
+  input[type=text], input[type=email], input[type=password], select{
+    width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:10px;
+    font-size:14px; font-family:inherit; background:#fbfcfe; color:var(--ink);
+  }
+  input:focus, select:focus{outline:2px solid var(--teal-soft); border-color:var(--teal);}
+
+  .btn{display:inline-flex; align-items:center; justify-content:center; gap:7px;
+    border:none; border-radius:11px; padding:12px 16px; font-size:14px; font-weight:600;
+    font-family:inherit; cursor:pointer; transition:.15s;}
+  .btn:active{transform:scale(.98);}
+  .btn-primary{background:var(--navy); color:#fff;}
+  .btn-teal{background:var(--teal); color:#fff;}
+  .btn-orange{background:var(--orange); color:#fff;}
+  .btn-ghost{background:#eef2f7; color:var(--navy);}
+  .btn-danger{background:#fdecea; color:var(--danger);}
+  .btn-block{width:100%;}
+  .btn[disabled]{opacity:.5; pointer-events:none;}
+  .row{display:flex; gap:8px; flex-wrap:wrap;}
+  .row > *{flex:1;}
+
+  .hint{font-size:12px; color:var(--muted); line-height:1.6; background:var(--teal-soft);
+    border-radius:10px; padding:9px 11px; margin:8px 0;}
+
+  /* Preview */
+  .preview-wrap{position:relative; width:100%; background:#dfe5ec; border-radius:10px;
+    overflow:hidden; touch-action:none; user-select:none;}
+  #pdfCanvas{display:block; width:100%; height:auto;}
+  #overlay{position:absolute; inset:0; touch-action:none;}
+  .rbox{position:absolute; border:2px dashed var(--teal); background:rgba(255,255,255,.78);
+    box-sizing:border-box; cursor:move;}
+  .rbox.sel{border-color:var(--orange); border-style:solid; background:rgba(224,138,43,.12);}
+  .rbox .tag{position:absolute; top:-9px; left:6px; background:var(--teal); color:#fff;
+    font-size:9px; padding:1px 6px; border-radius:8px; pointer-events:none;}
+  .rbox.sel .tag{background:var(--orange);}
+  .rbox .hdl{position:absolute; right:-9px; bottom:-9px; width:18px; height:18px;
+    background:var(--orange); border:2px solid #fff; border-radius:50%; cursor:nwse-resize;
+    box-shadow:0 1px 4px rgba(0,0,0,.3);}
+  .rbox .miniLogo{position:absolute; right:4px; top:50%; transform:translateY(-50%);
+    max-height:80%; max-width:36%; pointer-events:none; opacity:.92;}
+  .rbox .miniTxt{position:absolute; left:6px; top:5px; right:40%; font-size:8px;
+    line-height:1.25; color:var(--navy); pointer-events:none; overflow:hidden;}
+  .rbox .miniTxt b{font-size:9px;}
+
+  .pagebar{display:flex; align-items:center; justify-content:center; gap:14px; margin:10px 0 0;
+    font-size:13px; color:var(--muted);}
+  .pagebar button{width:34px; height:34px; border-radius:9px; border:1px solid var(--line);
+    background:#fff; font-size:16px;}
+
+  /* selected box panel */
+  .boxpanel{border:1px dashed var(--orange); border-radius:10px; padding:10px; margin-top:10px;
+    background:#fff8f0;}
+  .seg{display:flex; gap:6px; flex-wrap:wrap; margin-top:5px;}
+  .seg button{flex:1; min-width:60px; padding:8px 4px; border:1px solid var(--line);
+    background:#fff; border-radius:9px; font-size:12.5px; font-family:inherit; color:var(--ink);}
+  .seg button.on{background:var(--navy); color:#fff; border-color:var(--navy);}
+
+  /* profile list */
+  .plist .pitem{display:flex; align-items:center; gap:10px; padding:11px 12px;
+    border:1px solid var(--line); border-radius:11px; margin-bottom:8px; background:#fbfcfe;}
+  .plist .pitem.active{border-color:var(--teal); background:var(--teal-soft);}
+  .plist .pitem .nm{font-weight:600; font-size:14px;}
+  .plist .pitem .mt{font-size:11.5px; color:var(--muted);}
+  .plist .pitem .sp{margin-left:auto; display:flex; gap:6px;}
+  .icbtn{width:34px; height:34px; border-radius:9px; border:1px solid var(--line);
+    background:#fff; font-size:15px; display:flex; align-items:center; justify-content:center;}
+
+  .logoprev{display:flex; align-items:center; gap:12px; margin-top:8px;}
+  .logoprev img{height:54px; max-width:140px; border:1px solid var(--line); border-radius:8px;
+    background:#fff; padding:4px;}
+
+  /* bottom nav */
+  .nav{position:fixed; bottom:0; left:0; right:0; z-index:40; background:#fff;
+    border-top:1px solid var(--line); display:flex; max-width:640px; margin:0 auto;}
+  .nav button{flex:1; border:none; background:none; padding:9px 0 8px; font-family:inherit;
+    color:var(--muted); font-size:11px; display:flex; flex-direction:column; align-items:center; gap:3px;}
+  .nav button .ic{font-size:19px;}
+  .nav button.on{color:var(--navy); font-weight:700;}
+
+  .hidden{display:none !important;}
+  .center{text-align:center;}
+  .toast{position:fixed; bottom:88px; left:50%; transform:translateX(-50%);
+    background:var(--navy); color:#fff; padding:11px 18px; border-radius:24px; font-size:13px;
+    z-index:99; box-shadow:0 4px 14px rgba(0,0,0,.25); opacity:0; transition:.25s; pointer-events:none;}
+  .toast.show{opacity:1;}
+
+  /* auth screen */
+  #authScreen{min-height:80vh; display:flex; align-items:center; justify-content:center; padding:20px;}
+  #authScreen .card{width:100%; max-width:360px;}
+
+  .splash{position:fixed; inset:0; background:linear-gradient(135deg,var(--navy),var(--navy2));
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; z-index:200; color:#fff;}
+  .splash .ring{width:42px; height:42px; border:4px solid rgba(255,255,255,.25);
+    border-top-color:#fff; border-radius:50%; animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<div class="splash" id="splash"><div class="ring"></div><div>লোড হচ্ছে…</div></div>
+
+<div class="topbar">
+  <div class="brand">ইনসাফ টিকেট রিব্র্যান্ড <small>INSAF TRAVELS</small></div>
+  <div class="mode-chip" id="modeChip">লোকাল মোড</div>
+</div>
+
+<!-- ============ AUTH (শুধু Firebase মোডে দেখা যাবে) ============ -->
+<div id="authScreen" class="hidden">
+  <div class="card">
+    <h3><span class="dot"></span> লগইন</h3>
+    <label class="fld">ইমেইল</label>
+    <input type="email" id="authEmail" autocomplete="username" />
+    <label class="fld">পাসওয়ার্ড</label>
+    <input type="password" id="authPass" autocomplete="current-password" />
+    <div style="height:12px"></div>
+    <button class="btn btn-primary btn-block" id="loginBtn">প্রবেশ করুন</button>
+    <div class="hint" id="authMsg" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ============ MAIN APP ============ -->
+<div id="app" class="hidden">
+
+  <!-- TAB: রিব্র্যান্ড -->
+  <div class="wrap tab" id="tab-rebrand">
+    <div class="card">
+      <h3><span class="dot"></span> সোর্স প্রোফাইল</h3>
+      <div class="row">
+        <select id="profileSelect" style="flex:3"></select>
+        <button class="btn btn-ghost" id="newProfileBtn" style="flex:1">+ নতুন</button>
+      </div>
+      <div class="hint">প্রতিটা টিকেট সোর্সের (যেমন S.A FLY) জন্য একবার বক্স সেট করুন। পরে শুধু প্রোফাইল বেছে PDF আপলোড করলেই হবে।</div>
+    </div>
+
+    <div class="card">
+      <h3><span class="dot"></span> সোর্স টিকেট (PDF)</h3>
+      <input type="file" id="pdfInput" accept="application/pdf" style="display:none" />
+      <button class="btn btn-teal btn-block" id="pickPdfBtn">📄 PDF আপলোড করুন</button>
+      <div id="fileName" class="hint" style="display:none"></div>
+    </div>
+
+    <div class="card hidden" id="editorCard">
+      <h3><span class="dot"></span> বক্স বসান</h3>
+      <div class="hint">খালি জায়গায় আঙুল টেনে <b>নতুন সাদা বক্স</b> আঁকুন। বক্স টেনে সরান, কোনার কমলা হ্যান্ডেল টেনে সাইজ বদলান। বক্সে ট্যাপ করে নিচে সেটিং দিন।</div>
+      <div class="preview-wrap" id="previewWrap">
+        <canvas id="pdfCanvas"></canvas>
+        <div id="overlay"></div>
+      </div>
+      <div class="pagebar" id="pageBar" style="display:none">
+        <button id="prevPg">‹</button>
+        <span id="pgLabel">পৃষ্ঠা ১</span>
+        <button id="nextPg">›</button>
+      </div>
+
+      <!-- selected box settings -->
+      <div class="boxpanel hidden" id="boxPanel">
+        <div style="font-size:12.5px; color:var(--muted)">নির্বাচিত বক্সে কী বসবে</div>
+        <div class="seg" id="typeSeg">
+          <button data-t="white">সাদা</button>
+          <button data-t="logo">লোগো</button>
+          <button data-t="text">টেক্সট</button>
+          <button data-t="both">দুটোই</button>
+        </div>
+        <div style="font-size:12.5px; color:var(--muted); margin-top:9px">কোন পৃষ্ঠায়</div>
+        <div class="seg" id="pageSeg">
+          <button data-p="this">এই পৃষ্ঠা</button>
+          <button data-p="all">সব পৃষ্ঠা</button>
+        </div>
+        <div style="height:9px"></div>
+        <button class="btn btn-danger btn-block" id="delBoxBtn">🗑 এই বক্স মুছুন</button>
+      </div>
+
+      <div style="height:12px"></div>
+      <div class="row">
+        <button class="btn btn-ghost" id="saveProfileBtn">💾 প্রোফাইল সেভ</button>
+        <button class="btn btn-orange" id="generateBtn" style="flex:2">✨ নতুন PDF তৈরি করুন</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: ব্র্যান্ডিং -->
+  <div class="wrap tab hidden" id="tab-branding">
+    <div class="card">
+      <h3><span class="dot"></span> আমার ব্র্যান্ডিং</h3>
+      <div class="hint">টিকেটের বক্সে এই তথ্যগুলোই বসবে। যেকোনো সময় বদলাতে পারবেন।</div>
+      <label class="fld">কোম্পানির নাম</label>
+      <input type="text" id="bName" />
+      <label class="fld">ঠিকানা</label>
+      <input type="text" id="bAddr" />
+      <label class="fld">ইমেইল</label>
+      <input type="text" id="bEmail" />
+      <label class="fld">ফোন / হোয়াটসঅ্যাপ (ঐচ্ছিক)</label>
+      <input type="text" id="bPhone" />
+
+      <label class="fld">লোগো</label>
+      <input type="file" id="logoInput" accept="image/png,image/jpeg" style="display:none" />
+      <button class="btn btn-ghost btn-block" id="pickLogoBtn">🖼 লোগো আপলোড / বদল করুন</button>
+      <div class="logoprev hidden" id="logoPrev"><img id="logoImg" alt="logo" /></div>
+
+      <div style="height:14px"></div>
+      <button class="btn btn-primary btn-block" id="saveBrandBtn">💾 ব্র্যান্ডিং সেভ করুন</button>
+    </div>
+    <div class="card" id="logoutCard" style="display:none">
+      <button class="btn btn-danger btn-block" id="logoutBtn">লগআউট</button>
+    </div>
+  </div>
+
+  <!-- bottom nav -->
+  <div class="nav">
+    <button class="on" data-tab="rebrand"><span class="ic">🪪</span> রিব্র্যান্ড</button>
+    <button data-tab="branding"><span class="ic">🏷️</span> ব্র্যান্ডিং</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =================================================================
+   ইনসাফ টিকেট রিব্র্যান্ড — সিঙ্গেল ফাইল অ্যাপ
+   কাজ: সোর্স PDF-এর উপর সাদা বক্স বসিয়ে অন্য এজেন্টের লোগো/ইনফো ঢেকে
+        তার উপরে INSAF ব্র্যান্ডিং স্ট্যাম্প করা। আসল টিকেট তথ্য অপরিবর্তিত।
+   ================================================================= */
+
+function libsReady(){ return (typeof PDFLib!=="undefined") && (typeof pdfjsLib!=="undefined"); }
+function setupWorker(){
+  if(typeof pdfjsLib!=="undefined" && pdfjsLib.GlobalWorkerOptions){
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  }
+}
+/* in-memory fallback when localStorage is blocked (e.g. sandboxed preview) */
+const _mem = {};
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return (k in _mem)?_mem[k]:null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){ _mem[k]=v; } }
+
+const USE_FB = FIREBASE_CONFIG.apiKey && !FIREBASE_CONFIG.apiKey.includes("PASTE");
+let db=null, auth=null, uid="local";
+
+/* ---------- State ---------- */
+let branding = { name:"INSAF TRAVELS", addr:"443 Rong mahal tower, bandar bazar, sylhet",
+                 email:"info@insaftravelsbd.com", phone:"", logo:"" };
+let profiles = {};            // {id: {name, boxes:[...]}}
+let activeProfileId = null;
+let pdfBytes = null;          // Uint8Array of source pdf
+let pdfDoc = null;            // pdf.js doc
+let pageNum = 1, pageCount = 1;
+let renderW = 0, renderH = 0; // rendered canvas display size (css px)
+let selectedBoxIdx = -1;
+let sourceFileName = "ticket";
+
+/* box: {id, page(int), all(bool), type, x,y,w,h}  — x,y,w,h are 0..1 fractions */
+
+/* ---------- Helpers ---------- */
+const $ = id => document.getElementById(id);
+function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("show");
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),2200); }
+function uid4(){ return "b"+Math.random().toString(36).slice(2,8); }
+
+/* ---------- Storage layer (Firebase OR localStorage) ---------- */
+const LS = {
+  brand:"insaf_rebrand_branding",
+  profs:"insaf_rebrand_profiles"
+};
+async function loadBranding(){
+  if(USE_FB){
+    const d = await db.collection("rebrand").doc(uid).collection("meta").doc("branding").get();
+    if(d.exists) branding = Object.assign(branding, d.data());
+  } else {
+    const r = lsGet(LS.brand);
+    if(r) branding = Object.assign(branding, JSON.parse(r));
+  }
+}
+async function saveBranding(){
+  if(USE_FB){
+    await db.collection("rebrand").doc(uid).collection("meta").doc("branding").set(branding);
+  } else {
+    lsSet(LS.brand, JSON.stringify(branding));
+  }
+}
+async function loadProfiles(){
+  if(USE_FB){
+    const snap = await db.collection("rebrand").doc(uid).collection("profiles").get();
+    profiles = {}; snap.forEach(doc => profiles[doc.id] = doc.data());
+  } else {
+    const r = lsGet(LS.profs);
+    profiles = r ? JSON.parse(r) : {};
+  }
+}
+async function persistProfile(id){
+  if(USE_FB){
+    await db.collection("rebrand").doc(uid).collection("profiles").doc(id).set(profiles[id]);
+  } else {
+    lsSet(LS.profs, JSON.stringify(profiles));
+  }
+}
+async function removeProfile(id){
+  delete profiles[id];
+  if(USE_FB){
+    await db.collection("rebrand").doc(uid).collection("profiles").doc(id).delete();
+  } else {
+    lsSet(LS.profs, JSON.stringify(profiles));
+  }
+}
+
+/* ---------- Init ---------- */
+async function boot(){
+ try{
+  if(USE_FB){
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore(); auth = firebase.auth();
+    $("modeChip").textContent = "ক্লাউড সিঙ্ক";
+    $("logoutCard").style.display = "block";
+    auth.onAuthStateChanged(async u=>{
+      if(u){ uid=u.uid; $("authScreen").classList.add("hidden");
+             $("app").classList.remove("hidden"); await afterAuth(); }
+      else { $("app").classList.add("hidden"); $("authScreen").classList.remove("hidden");
+             $("splash").classList.add("hidden"); }
+    });
+  } else {
+    setupWorker();
+    $("app").classList.remove("hidden");
+    await afterAuth();
+  }
+ }catch(e){
+   console.error("boot error", e);
+   $("splash").classList.add("hidden");
+   $("app").classList.remove("hidden");
+   toast("চালু হলো, তবে একটি সমস্যা ছিল");
+ }
+}
+async function afterAuth(){
+  try{
+    setupWorker();
+    await loadBranding();
+    await loadProfiles();
+  }catch(e){ console.error(e); toast("ডেটা লোডে সমস্যা — তবু চালু থাকবে"); }
+  fillBrandingForm();
+  refreshProfileSelect();
+  $("splash").classList.add("hidden");
+  if(!libsReady()){
+    toast("PDF লাইব্রেরি লোড হয়নি — ইন্টারনেট সংযোগ দরকার");
+  }
+}
+
+/* ---------- Auth handlers ---------- */
+$("loginBtn") && ($("loginBtn").onclick = async ()=>{
+  try{
+    await auth.signInWithEmailAndPassword($("authEmail").value.trim(), $("authPass").value);
+  }catch(e){
+    const m=$("authMsg"); m.style.display="block";
+    m.textContent = "লগইন ব্যর্থ: "+ (e.code||e.message);
+  }
+});
+$("logoutBtn") && ($("logoutBtn").onclick = ()=> auth.signOut());
+
+/* ---------- Branding form ---------- */
+function fillBrandingForm(){
+  $("bName").value=branding.name||""; $("bAddr").value=branding.addr||"";
+  $("bEmail").value=branding.email||""; $("bPhone").value=branding.phone||"";
+  if(branding.logo){ $("logoImg").src=branding.logo; $("logoPrev").classList.remove("hidden"); }
+}
+$("pickLogoBtn").onclick = ()=> $("logoInput").click();
+$("logoInput").onchange = e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload = ()=>{ branding.logo=r.result; $("logoImg").src=r.result;
+    $("logoPrev").classList.remove("hidden"); toast("লোগো যুক্ত হলো — সেভ করতে ভুলবেন না"); };
+  r.readAsDataURL(f);
+};
+$("saveBrandBtn").onclick = async ()=>{
+  branding.name=$("bName").value.trim(); branding.addr=$("bAddr").value.trim();
+  branding.email=$("bEmail").value.trim(); branding.phone=$("bPhone").value.trim();
+  await saveBranding(); renderBoxes(); toast("ব্র্যান্ডিং সেভ হলো ✓");
+};
+
+/* ---------- Profiles ---------- */
+function refreshProfileSelect(){
+  const sel=$("profileSelect"); sel.innerHTML="";
+  const ids=Object.keys(profiles);
+  if(ids.length===0){
+    const o=document.createElement("option"); o.value=""; o.textContent="— কোনো প্রোফাইল নেই, + নতুন চাপুন —";
+    sel.appendChild(o); activeProfileId=null;
+  } else {
+    ids.forEach(id=>{ const o=document.createElement("option");
+      o.value=id; o.textContent=profiles[id].name+" ("+profiles[id].boxes.length+" বক্স)";
+      sel.appendChild(o); });
+    if(!activeProfileId || !profiles[activeProfileId]) activeProfileId=ids[0];
+    sel.value=activeProfileId;
+  }
+  if(pdfDoc) renderBoxes();
+}
+$("profileSelect").onchange = e=>{ activeProfileId=e.target.value; selectedBoxIdx=-1;
+  hideBoxPanel(); renderBoxes(); };
+$("newProfileBtn").onclick = async ()=>{
+  const nm = prompt("নতুন সোর্সের নাম (যেমন: S.A FLY INTERNATIONAL)");
+  if(!nm) return;
+  const id=uid4(); profiles[id]={name:nm.trim(), boxes:[]}; activeProfileId=id;
+  await persistProfile(id); refreshProfileSelect(); toast("প্রোফাইল তৈরি হলো");
+};
+$("saveProfileBtn").onclick = async ()=>{
+  if(!activeProfileId){ toast("আগে একটা প্রোফাইল বানান/বাছুন"); return; }
+  await persistProfile(activeProfileId); refreshProfileSelect(); toast("প্রোফাইল সেভ হলো ✓");
+};
+
+/* ---------- PDF load & render ---------- */
+$("pickPdfBtn").onclick = ()=> $("pdfInput").click();
+$("pdfInput").onchange = async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  if(!libsReady()){ toast("PDF লাইব্রেরি লোড হয়নি — ইন্টারনেট সংযোগ দরকার"); return; }
+  setupWorker();
+  sourceFileName = f.name.replace(/\.pdf$/i,"") || "ticket";
+  $("fileName").style.display="block"; $("fileName").textContent="📄 "+f.name;
+  const buf = await f.arrayBuffer();
+  pdfBytes = new Uint8Array(buf);
+  // pdf.js consumes the buffer; keep a separate copy for pdf-lib
+  pdfDoc = await pdfjsLib.getDocument({data: pdfBytes.slice()}).promise;
+  pageCount = pdfDoc.numPages; pageNum=1;
+  $("editorCard").classList.remove("hidden");
+  $("pageBar").style.display = pageCount>1 ? "flex" : "none";
+  selectedBoxIdx=-1; hideBoxPanel();
+  await renderPage();
+};
+$("prevPg").onclick = async ()=>{ if(pageNum>1){pageNum--; selectedBoxIdx=-1; hideBoxPanel(); await renderPage();} };
+$("nextPg").onclick = async ()=>{ if(pageNum<pageCount){pageNum++; selectedBoxIdx=-1; hideBoxPanel(); await renderPage();} };
+
+async function renderPage(){
+  const page = await pdfDoc.getPage(pageNum);
+  const wrapW = $("previewWrap").clientWidth || 320;
+  const baseVp = page.getViewport({scale:1});
+  const scale = wrapW / baseVp.width;
+  const vp = page.getViewport({scale});
+  const canvas=$("pdfCanvas"), ctx=canvas.getContext("2d");
+  const dpr = window.devicePixelRatio||1;
+  canvas.width = vp.width*dpr; canvas.height=vp.height*dpr;
+  canvas.style.width=vp.width+"px"; canvas.style.height=vp.height+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  await page.render({canvasContext:ctx, viewport:vp}).promise;
+  renderW=vp.width; renderH=vp.height;
+  $("overlay").style.width=vp.width+"px"; $("overlay").style.height=vp.height+"px";
+  $("pgLabel").textContent = "পৃষ্ঠা "+toBn(pageNum)+" / "+toBn(pageCount);
+  renderBoxes();
+}
+function toBn(n){ const d="০১২৩৪৫৬৭৮৯"; return String(n).replace(/\d/g,x=>d[x]); }
+
+/* ---------- Box overlay rendering ---------- */
+function currentBoxes(){ return (activeProfileId && profiles[activeProfileId]) ? profiles[activeProfileId].boxes : []; }
+function boxesOnThisPage(){
+  return currentBoxes().map((b,i)=>({b,i})).filter(o=> o.b.all || o.b.page===pageNum );
+}
+const TYPE_LABEL = {white:"সাদা", logo:"লোগো", text:"টেক্সট", both:"লোগো+টেক্সট"};
+function renderBoxes(){
+  const ov=$("overlay"); ov.innerHTML="";
+  if(!renderW) return;
+  boxesOnThisPage().forEach(({b,i})=>{
+    const el=document.createElement("div");
+    el.className="rbox"+(i===selectedBoxIdx?" sel":"");
+    el.style.left=(b.x*renderW)+"px"; el.style.top=(b.y*renderH)+"px";
+    el.style.width=(b.w*renderW)+"px"; el.style.height=(b.h*renderH)+"px";
+    el.dataset.idx=i;
+    const tag=document.createElement("div"); tag.className="tag";
+    tag.textContent=TYPE_LABEL[b.type]+(b.all?" · সব":""); el.appendChild(tag);
+    // mini preview of branding inside the box
+    if((b.type==="text"||b.type==="both")){
+      const t=document.createElement("div"); t.className="miniTxt";
+      t.innerHTML="<b>"+esc(branding.name)+"</b><br>"+esc(branding.addr)+"<br>"+esc(branding.email);
+      if(b.type==="text") t.style.right="6px";
+      el.appendChild(t);
+    }
+    if((b.type==="logo"||b.type==="both") && branding.logo){
+      const im=document.createElement("img"); im.className="miniLogo"; im.src=branding.logo;
+      if(b.type==="logo"){ im.style.left="50%"; im.style.right="auto"; im.style.transform="translate(-50%,-50%)"; }
+      el.appendChild(im);
+    }
+    const h=document.createElement("div"); h.className="hdl"; el.appendChild(h);
+    ov.appendChild(el);
+  });
+}
+function esc(s){ return (s||"").replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+
+/* ---------- Pointer: draw / move / resize ---------- */
+let mode=null, startX=0, startY=0, draftEl=null, activeIdx=-1, originBox=null;
+const ov = $("overlay");
+
+ov.addEventListener("pointerdown", e=>{
+  if(!activeProfileId){ toast("আগে একটা প্রোফাইল বানান/বাছুন"); return; }
+  if(!renderW) return;
+  const rect=ov.getBoundingClientRect();
+  const px=e.clientX-rect.left, py=e.clientY-rect.top;
+  const target=e.target;
+
+  if(target.classList.contains("hdl")){            // resize
+    mode="resize"; activeIdx=+target.parentElement.dataset.idx;
+    selectedBoxIdx=activeIdx; originBox={...currentBoxes()[activeIdx]};
+    startX=px; startY=py; ov.setPointerCapture(e.pointerId); renderBoxes(); showBoxPanel(); return;
+  }
+  if(target.classList.contains("rbox") || target.parentElement?.classList.contains("rbox")){ // move
+    const boxEl = target.classList.contains("rbox")? target : target.parentElement;
+    mode="move"; activeIdx=+boxEl.dataset.idx; selectedBoxIdx=activeIdx;
+    originBox={...currentBoxes()[activeIdx]}; startX=px; startY=py;
+    ov.setPointerCapture(e.pointerId); renderBoxes(); showBoxPanel(); return;
+  }
+  // draw new
+  mode="draw"; startX=px; startY=py;
+  draftEl=document.createElement("div"); draftEl.className="rbox sel";
+  draftEl.style.left=px+"px"; draftEl.style.top=py+"px"; draftEl.style.width="0px"; draftEl.style.height="0px";
+  ov.appendChild(draftEl); ov.setPointerCapture(e.pointerId);
+});
+ov.addEventListener("pointermove", e=>{
+  if(!mode) return;
+  const rect=ov.getBoundingClientRect();
+  let px=e.clientX-rect.left, py=e.clientY-rect.top;
+  px=Math.max(0,Math.min(renderW,px)); py=Math.max(0,Math.min(renderH,py));
+  if(mode==="draw"){
+    const x=Math.min(px,startX), y=Math.min(py,startY);
+    draftEl.style.left=x+"px"; draftEl.style.top=y+"px";
+    draftEl.style.width=Math.abs(px-startX)+"px"; draftEl.style.height=Math.abs(py-startY)+"px";
+  } else if(mode==="move"){
+    const dx=(px-startX)/renderW, dy=(py-startY)/renderH;
+    const b=currentBoxes()[activeIdx];
+    b.x=clamp01(originBox.x+dx, originBox.w); b.y=clamp01(originBox.y+dy, originBox.h);
+    renderBoxes();
+  } else if(mode==="resize"){
+    const b=currentBoxes()[activeIdx];
+    b.w=Math.max(0.02, Math.min(1-b.x, originBox.w+(px-startX)/renderW));
+    b.h=Math.max(0.01, Math.min(1-b.y, originBox.h+(py-startY)/renderH));
+    renderBoxes();
+  }
+});
+function clamp01(v, size){ return Math.max(0, Math.min(1-size, v)); }
+
+ov.onpointerup = async function(e){
+  if(mode==="draw" && draftEl){
+    const x=parseFloat(draftEl.style.left), y=parseFloat(draftEl.style.top);
+    const w=parseFloat(draftEl.style.width), h=parseFloat(draftEl.style.height);
+    draftEl.remove(); draftEl=null;
+    if(w>12 && h>8 && activeProfileId){
+      const nb={ id:uid4(), page:pageNum, all:false, type:"both",
+        x:x/renderW, y:y/renderH, w:w/renderW, h:h/renderH };
+      profiles[activeProfileId].boxes.push(nb);
+      selectedBoxIdx = profiles[activeProfileId].boxes.length-1;
+      await persistProfile(activeProfileId);
+      renderBoxes(); showBoxPanel();
+    }
+  } else if(mode==="move" || mode==="resize"){
+    if(activeProfileId) await persistProfile(activeProfileId);
+  }
+  mode=null; activeIdx=-1;
+};
+
+/* ---------- Box settings panel ---------- */
+function showBoxPanel(){
+  const b=currentBoxes()[selectedBoxIdx]; if(!b){ hideBoxPanel(); return; }
+  $("boxPanel").classList.remove("hidden");
+  [...$("typeSeg").children].forEach(btn=> btn.classList.toggle("on", btn.dataset.t===b.type));
+  [...$("pageSeg").children].forEach(btn=> btn.classList.toggle("on",
+      (btn.dataset.p==="all")===!!b.all));
+}
+function hideBoxPanel(){ $("boxPanel").classList.add("hidden"); }
+$("typeSeg").onclick = async e=>{
+  const t=e.target.dataset.t; if(!t) return;
+  const b=currentBoxes()[selectedBoxIdx]; if(!b) return;
+  b.type=t; await persistProfile(activeProfileId); showBoxPanel(); renderBoxes();
+};
+$("pageSeg").onclick = async e=>{
+  const p=e.target.dataset.p; if(!p) return;
+  const b=currentBoxes()[selectedBoxIdx]; if(!b) return;
+  b.all = (p==="all"); if(!b.all) b.page=pageNum;
+  await persistProfile(activeProfileId); showBoxPanel(); renderBoxes();
+};
+$("delBoxBtn").onclick = async ()=>{
+  if(selectedBoxIdx<0) return;
+  currentBoxes().splice(selectedBoxIdx,1); selectedBoxIdx=-1;
+  await persistProfile(activeProfileId); hideBoxPanel(); renderBoxes(); refreshProfileSelect();
+};
+
+/* ---------- GENERATE: stamp branding onto PDF (pdf-lib) ---------- */
+$("generateBtn").onclick = async ()=>{
+  if(!pdfBytes){ toast("আগে PDF আপলোড করুন"); return; }
+  if(!libsReady()){ toast("PDF লাইব্রেরি লোড হয়নি — ইন্টারনেট দরকার"); return; }
+  if(!activeProfileId || currentBoxes().length===0){ toast("অন্তত একটা বক্স আঁকুন"); return; }
+  $("generateBtn").disabled=true; $("generateBtn").textContent="তৈরি হচ্ছে…";
+  try{
+    const out = await buildPdf();
+    const blob = new Blob([out], {type:"application/pdf"});
+    const fname = sourceFileName+"-insaf.pdf";
+    const file = new File([blob], fname, {type:"application/pdf"});
+    // try native share (mobile), else download
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file], title:fname}); }
+      catch(_){ downloadBlob(blob,fname); }
+    } else {
+      downloadBlob(blob,fname);
+    }
+    toast("নতুন PDF তৈরি ✓");
+  }catch(err){
+    console.error(err); toast("সমস্যা: "+(err.message||err));
+  }finally{
+    $("generateBtn").disabled=false; $("generateBtn").textContent="✨ নতুন PDF তৈরি করুন";
+  }
+};
+function downloadBlob(blob,name){
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+}
+
+async function buildPdf(){
+  const { PDFDocument, rgb, StandardFonts } = PDFLib;
+  const doc = await PDFDocument.load(pdfBytes.slice());
+  const pages = doc.getPages();
+  const helv = await doc.embedFont(StandardFonts.Helvetica);
+  const helvB = await doc.embedFont(StandardFonts.HelveticaBold);
+
+  // embed logo once
+  let logoImg=null;
+  if(branding.logo){
+    const m=branding.logo.match(/^data:(image\/\w+);base64,(.*)$/);
+    if(m){
+      const bytes=Uint8Array.from(atob(m[2]), c=>c.charCodeAt(0));
+      logoImg = (m[1]==="image/png") ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
+    }
+  }
+
+  const navy = rgb(0.043,0.145,0.27), gray = rgb(0.30,0.34,0.40);
+
+  for(const b of currentBoxes()){
+    const targets = b.all ? pages.map((_,i)=>i) : [b.page-1];
+    for(const pi of targets){
+      const page = pages[pi]; if(!page) continue;
+      const pw=page.getWidth(), ph=page.getHeight();
+      const bx=b.x*pw, bw=b.w*pw, bh=b.h*ph;
+      const topY = ph - b.y*ph;            // top edge in pdf coords
+      const bottomY = topY - bh;           // bottom edge
+      const bleed=1;
+      // white cover
+      page.drawRectangle({ x:bx-bleed, y:bottomY-bleed, width:bw+2*bleed, height:bh+2*bleed,
+        color: rgb(1,1,1) });
+
+      const pad = Math.min(bh*0.12, 6);
+      // logo region
+      let logoW=0;
+      const wantLogo = (b.type==="logo"||b.type==="both") && logoImg;
+      const wantText = (b.type==="text"||b.type==="both");
+      if(wantLogo){
+        const regionW = (b.type==="both") ? bw*0.34 : bw;
+        const availW = regionW - 2*pad, availH = bh - 2*pad;
+        const sc = Math.min(availW/logoImg.width, availH/logoImg.height);
+        const dw=logoImg.width*sc, dh=logoImg.height*sc;
+        const lx = (b.type==="both") ? (bx+bw-dw-pad) : (bx+(bw-dw)/2);
+        const ly = bottomY + (bh-dh)/2;
+        page.drawImage(logoImg,{x:lx,y:ly,width:dw,height:dh});
+        logoW = (b.type==="both") ? regionW : 0;
+      }
+      if(wantText){
+        const availTextW = bw - logoW - 2*pad;
+        const lines = [];
+        if(branding.name)  lines.push({t:branding.name, b:true});
+        if(branding.addr)  lines.push({t:branding.addr, b:false});
+        if(branding.email) lines.push({t:branding.email, b:false});
+        if(branding.phone) lines.push({t:branding.phone, b:false});
+        // size by box height
+        let nameSize = Math.min(bh*0.30, 15);
+        let bodySize = Math.min(bh*0.18, 9.5);
+        const gap = bh*0.06;
+        // total height check
+        let need = nameSize + gap;
+        for(let i=1;i<lines.length;i++) need += bodySize + gap;
+        if(need > bh - 2*pad){ const f=(bh-2*pad)/need; nameSize*=f; bodySize*=f; }
+        // shrink to fit width
+        const fit=(txt,size,bold)=>{ const fnt=bold?helvB:helv;
+          while(size>4 && fnt.widthOfTextAtSize(txt,size) > availTextW){ size-=0.4; } return size; };
+        let cy = topY - pad;     // start from top
+        lines.forEach((ln,i)=>{
+          const bold=ln.b, base=bold?nameSize:bodySize;
+          const size=fit(ln.t, base, bold);
+          cy -= size;            // move baseline down
+          page.drawText(ln.t, { x:bx+pad, y:cy, size, font: bold?helvB:helv,
+            color: bold?navy:gray });
+          cy -= gap;
+        });
+      }
+    }
+  }
+  return await doc.save();
+}
+
+/* ---------- Tabs ---------- */
+document.querySelectorAll(".nav button").forEach(btn=>{
+  btn.onclick = ()=>{
+    document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("on"));
+    btn.classList.add("on");
+    document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
+    $("tab-"+btn.dataset.tab).classList.remove("hidden");
+  };
+});
+
+/* re-render preview on resize/orientation */
+let rT; window.addEventListener("resize", ()=>{ clearTimeout(rT);
+  rT=setTimeout(()=>{ if(pdfDoc) renderPage(); },250); });
+
+boot();
+</script>
+</body>
+</html>
