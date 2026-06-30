@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0b2545" />
+<title>ইনসাফ টিকেট রিব্র্যান্ড</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+<!-- ===================== ফায়ারবেজ কনফিগ =====================
+  নিচের ভ্যালুগুলো আপনার Firebase প্রজেক্টের দিয়ে বদলালে অ্যাপ সব ডিভাইসে সিঙ্ক হবে।
+  খালি/PASTE থাকলে অ্যাপ স্বয়ংক্রিয়ভাবে লোকাল মোডে (এই ব্রাউজারে সেভ) চলবে — কোনো লগইন লাগবে না।
+================================================================= -->
+<script>
+  const FIREBASE_CONFIG = {
+    apiKey: "PASTE_YOUR_API_KEY",
+    authDomain: "PASTE.firebaseapp.com",
+    projectId: "PASTE",
+    storageBucket: "PASTE.appspot.com",
+    messagingSenderId: "PASTE",
+    appId: "PASTE"
+  };
+</script>
+
+<!-- লাইব্রেরি (cdnjs) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-auth-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-firestore-compat.min.js"></script>
+
+<style>
+  :root{
+    --navy:#0b2545; --navy2:#13315c; --teal:#1f8a8c; --teal-soft:#e6f4f4;
+    --orange:#e08a2b; --ink:#1a2230; --muted:#6b7785; --line:#e3e8ef;
+    --bg:#f5f7fa; --white:#fff; --danger:#c0392b; --ok:#1f8a4d;
+    --radius:14px; --shadow:0 2px 10px rgba(11,37,69,.08);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0;}
+  body{
+    font-family:"Noto Sans Bengali","Segoe UI",system-ui,sans-serif;
+    background:var(--bg); color:var(--ink); padding-bottom:74px;
+    overscroll-behavior-y:contain;
+  }
+  /* Header */
+  .topbar{
+    position:sticky; top:0; z-index:30;
+    background:linear-gradient(135deg,var(--navy),var(--navy2));
+    color:#fff; padding:12px 16px; display:flex; align-items:center; gap:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
+  }
+  .topbar .brand{font-weight:700; font-size:16px; letter-spacing:.2px;}
+  .topbar .brand small{display:block; font-weight:400; font-size:11px; opacity:.8;}
+  .mode-chip{margin-left:auto; font-size:11px; background:rgba(255,255,255,.15);
+    padding:4px 9px; border-radius:20px;}
+
+  .wrap{max-width:640px; margin:0 auto; padding:14px;}
+  .card{background:var(--white); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:14px; margin-bottom:14px;}
+  .card h3{margin:0 0 10px; font-size:15px; color:var(--navy); display:flex; align-items:center; gap:7px;}
+  .card h3 .dot{width:8px; height:8px; border-radius:50%; background:var(--teal);}
+  label.fld{display:block; font-size:12.5px; color:var(--muted); margin:10px 0 4px;}
+  input[type=text], input[type=email], input[type=password], select{
+    width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:10px;
+    font-size:14px; font-family:inherit; background:#fbfcfe; color:var(--ink);
+  }
+  input:focus, select:focus{outline:2px solid var(--teal-soft); border-color:var(--teal);}
+
+  .btn{display:inline-flex; align-items:center; justify-content:center; gap:7px;
+    border:none; border-radius:11px; padding:12px 16px; font-size:14px; font-weight:600;
+    font-family:inherit; cursor:pointer; transition:.15s;}
+  .btn:active{transform:scale(.98);}
+  .btn-primary{background:var(--navy); color:#fff;}
+  .btn-teal{background:var(--teal); color:#fff;}
+  .btn-orange{background:var(--orange); color:#fff;}
+  .btn-ghost{background:#eef2f7; color:var(--navy);}
+  .btn-danger{background:#fdecea; color:var(--danger);}
+  .btn-block{width:100%;}
+  .btn[disabled]{opacity:.5; pointer-events:none;}
+  .row{display:flex; gap:8px; flex-wrap:wrap;}
+  .row > *{flex:1;}
+
+  .hint{font-size:12px; color:var(--muted); line-height:1.6; background:var(--teal-soft);
+    border-radius:10px; padding:9px 11px; margin:8px 0;}
+
+  /* Preview */
+  .preview-wrap{position:relative; width:100%; background:#dfe5ec; border-radius:10px;
+    overflow:auto; max-height:68vh; touch-action:pan-x pan-y; user-select:none;
+    -webkit-overflow-scrolling:touch;}
+  #pdfCanvas{display:block; width:100%; height:auto;}
+  #overlay{position:absolute; inset:0; touch-action:pan-x pan-y;}
+  .rbox{position:absolute; border:1.5px dashed var(--teal); background:#fff;
+    box-sizing:border-box; cursor:move; touch-action:none;}
+  .rbox.sel{border-color:var(--orange); border-style:solid; border-width:2px; background:#fff;}
+  .rbox.locked{border-style:dotted; border-color:#9aa6b2; cursor:default;}
+  .rbox .tag{position:absolute; top:-10px; left:50%; transform:translateX(-50%);
+    background:var(--teal); color:#fff; font-size:9px; padding:1px 6px; border-radius:8px;
+    pointer-events:none; white-space:nowrap;}
+  .rbox.sel .tag{background:var(--orange);}
+  .rbox .del{position:absolute; top:2px; right:2px; width:22px; height:22px; border-radius:50%;
+    background:var(--danger); color:#fff; font-size:15px; line-height:20px; text-align:center;
+    border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.35); cursor:pointer; z-index:3;}
+  .rbox .hdl{position:absolute; width:22px; height:22px; background:var(--orange);
+    border:2px solid #fff; border-radius:50%; box-shadow:0 1px 4px rgba(0,0,0,.3); z-index:2;}
+  .rbox .hdl.br{right:-11px; bottom:-11px; cursor:nwse-resize;}
+  .rbox .hdl.tl{left:-11px; top:-11px; cursor:nwse-resize;}
+  .rbox .miniLogo{position:absolute; right:4px; top:50%; transform:translateY(-50%);
+    max-height:90%; max-width:36%; pointer-events:none; object-fit:contain;}
+  .rbox .miniTxt{position:absolute; left:6px; top:5px; right:40%; font-size:8px;
+    line-height:1.25; color:var(--navy); pointer-events:none; overflow:hidden;}
+  .rbox .miniTxt b{font-size:9px;}
+
+  .pagebar{display:flex; align-items:center; justify-content:center; gap:14px; margin:10px 0 0;
+    font-size:13px; color:var(--muted);}
+  .pagebar button{width:34px; height:34px; border-radius:9px; border:1px solid var(--line);
+    background:#fff; font-size:16px;}
+  .viewbar{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+  .viewbar .zbtn{width:40px; height:40px; border-radius:9px; border:1px solid var(--line);
+    background:#fff; font-size:20px; color:var(--navy); display:flex; align-items:center; justify-content:center;}
+  .viewbar .zlbl{font-size:13px; color:var(--muted); min-width:52px; text-align:center; font-weight:600;}
+
+  /* selected box panel — pinned near bottom for easy reach */
+  .boxpanel{border:1px solid var(--orange); border-radius:12px; padding:10px; margin-top:10px;
+    background:#fff8f0; position:sticky; bottom:82px; z-index:20;
+    box-shadow:0 -3px 14px rgba(11,37,69,.16);}
+  .seg{display:flex; gap:6px; flex-wrap:wrap; margin-top:5px;}
+  .seg button{flex:1; min-width:60px; padding:8px 4px; border:1px solid var(--line);
+    background:#fff; border-radius:9px; font-size:12.5px; font-family:inherit; color:var(--ink);}
+  .seg button.on{background:var(--navy); color:#fff; border-color:var(--navy);}
+  #customWrap textarea{width:100%; padding:10px 11px; border:1px solid var(--line); border-radius:10px;
+    font-size:13.5px; font-family:inherit; background:#fff; color:var(--ink); resize:vertical;}
+
+  /* profile list */
+  .plist .pitem{display:flex; align-items:center; gap:10px; padding:11px 12px;
+    border:1px solid var(--line); border-radius:11px; margin-bottom:8px; background:#fbfcfe;}
+  .plist .pitem.active{border-color:var(--teal); background:var(--teal-soft);}
+  .plist .pitem .nm{font-weight:600; font-size:14px;}
+  .plist .pitem .mt{font-size:11.5px; color:var(--muted);}
+  .plist .pitem .sp{margin-left:auto; display:flex; gap:6px;}
+  .icbtn{width:34px; height:34px; border-radius:9px; border:1px solid var(--line);
+    background:#fff; font-size:15px; display:flex; align-items:center; justify-content:center;}
+
+  .logoprev{display:flex; align-items:center; gap:12px; margin-top:8px;}
+  .logoprev img{height:54px; max-width:140px; border:1px solid var(--line); border-radius:8px;
+    background:#fff; padding:4px;}
+
+  /* bottom nav */
+  .nav{position:fixed; bottom:0; left:0; right:0; z-index:40; background:#fff;
+    border-top:1px solid var(--line); display:flex; max-width:640px; margin:0 auto;}
+  .nav button{flex:1; border:none; background:none; padding:9px 0 8px; font-family:inherit;
+    color:var(--muted); font-size:11px; display:flex; flex-direction:column; align-items:center; gap:3px;}
+  .nav button .ic{font-size:19px;}
+  .nav button.on{color:var(--navy); font-weight:700;}
+
+  .hidden{display:none !important;}
+  .center{text-align:center;}
+  .toast{position:fixed; bottom:88px; left:50%; transform:translateX(-50%);
+    background:var(--navy); color:#fff; padding:11px 18px; border-radius:24px; font-size:13px;
+    z-index:99; box-shadow:0 4px 14px rgba(0,0,0,.25); opacity:0; transition:.25s; pointer-events:none;}
+  .toast.show{opacity:1;}
+
+  /* auth screen */
+  #authScreen{min-height:80vh; display:flex; align-items:center; justify-content:center; padding:20px;}
+  #authScreen .card{width:100%; max-width:360px;}
+
+  .splash{position:fixed; inset:0; background:linear-gradient(135deg,var(--navy),var(--navy2));
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; z-index:200; color:#fff;}
+  .splash .ring{width:42px; height:42px; border:4px solid rgba(255,255,255,.25);
+    border-top-color:#fff; border-radius:50%; animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* output preview modal */
+  .pvmodal{position:fixed; inset:0; background:rgba(11,37,69,.72); z-index:150;
+    display:flex; align-items:center; justify-content:center; padding:14px;}
+  .pvbox{background:var(--white); border-radius:var(--radius); width:100%; max-width:520px;
+    max-height:92vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 10px 40px rgba(0,0,0,.4);}
+  .pvhead{display:flex; align-items:center; justify-content:space-between; padding:13px 16px;
+    background:var(--navy); color:#fff; font-weight:600; font-size:15px;}
+  .pvhead button{background:transparent; border:0; color:#fff; font-size:20px; cursor:pointer; line-height:1;}
+  .pvbody{flex:1; overflow:auto; background:#e9edf2; padding:12px; display:flex;
+    flex-direction:column; align-items:center; gap:12px;}
+  .pvbody canvas{max-width:100%; box-shadow:0 2px 10px rgba(0,0,0,.18); border-radius:4px; background:#fff;}
+  .pvfoot{display:flex; gap:10px; padding:12px 14px; border-top:1px solid var(--line);}
+</style>
+</head>
+<body>
+
+<div class="splash" id="splash"><div class="ring"></div><div>লোড হচ্ছে…</div></div>
+
+<div class="topbar">
+  <div class="brand">ইনসাফ টিকেট রিব্র্যান্ড <small>INSAF TRAVELS</small></div>
+  <div class="mode-chip" id="modeChip">লোকাল মোড</div>
+</div>
+
+<!-- ============ AUTH (শুধু Firebase মোডে দেখা যাবে) ============ -->
+<div id="authScreen" class="hidden">
+  <div class="card">
+    <h3><span class="dot"></span> লগইন</h3>
+    <label class="fld">ইমেইল</label>
+    <input type="email" id="authEmail" autocomplete="username" />
+    <label class="fld">পাসওয়ার্ড</label>
+    <input type="password" id="authPass" autocomplete="current-password" />
+    <div style="height:12px"></div>
+    <button class="btn btn-primary btn-block" id="loginBtn">প্রবেশ করুন</button>
+    <div class="hint" id="authMsg" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ============ MAIN APP ============ -->
+<div id="app" class="hidden">
+
+  <!-- TAB: রিব্র্যান্ড -->
+  <div class="wrap tab" id="tab-rebrand">
+    <div class="card">
+      <h3><span class="dot"></span> সোর্স প্রোফাইল</h3>
+      <div class="row">
+        <select id="profileSelect" style="flex:3"></select>
+        <button class="btn btn-ghost" id="newProfileBtn" style="flex:1">+ নতুন</button>
+      </div>
+      <div class="row" id="profileActions" style="margin-top:8px; display:none">
+        <button class="btn btn-ghost" id="renameProfileBtn" style="flex:1">✏️ নাম বদল</button>
+        <button class="btn btn-danger" id="delProfileBtn" style="flex:1">🗑 প্রোফাইল মুছুন</button>
+      </div>
+      <div class="hint">প্রতিটা টিকেট সোর্সের (যেমন S.A FLY) জন্য একবার বক্স সেট করুন। পরে শুধু প্রোফাইল বেছে PDF আপলোড করলেই হবে।</div>
+    </div>
+
+    <div class="card">
+      <h3><span class="dot"></span> সোর্স টিকেট (PDF)</h3>
+      <input type="file" id="pdfInput" accept="application/pdf" style="display:none" />
+      <button class="btn btn-teal btn-block" id="pickPdfBtn">📄 PDF আপলোড করুন</button>
+      <div id="fileName" class="hint" style="display:none"></div>
+    </div>
+
+    <div class="card hidden" id="editorCard">
+      <h3><span class="dot"></span> বক্স বসান</h3>
+      <div class="hint">নিচের বাটন চেপে বক্স যোগ করুন। তারপর বক্স <b>টেনে</b> জায়গামতো বসান, কোণের কমলা হ্যান্ডেল টেনে সাইজ মেলান। খালি জায়গায় আঙুল দিলে পৃষ্ঠা স্ক্রল হবে।</div>
+      <div class="row" style="margin-bottom:10px">
+        <button class="btn btn-teal" id="addBoxBtn">➕ বক্স যোগ</button>
+        <button class="btn btn-ghost" id="addTextBtn">✍️ কাস্টম টেক্সট</button>
+        <button class="btn btn-ghost" id="undoBtn" style="flex:0 0 52px" disabled>↩️</button>
+      </div>
+      <div class="viewbar">
+        <button class="zbtn" id="zoomOut">−</button>
+        <span class="zlbl" id="zoomLbl">১০০%</span>
+        <button class="zbtn" id="zoomIn">+</button>
+        <button class="zbtn" id="zoomReset" style="width:auto; padding:0 12px; font-size:13px">ফিট</button>
+        <span style="font-size:11.5px; color:var(--muted); margin-left:auto">জুম করে নিখুঁত বসান</span>
+      </div>
+      <div class="preview-wrap" id="previewWrap">
+        <canvas id="pdfCanvas"></canvas>
+        <div id="overlay"></div>
+      </div>
+      <div class="pagebar" id="pageBar" style="display:none">
+        <button id="prevPg">‹</button>
+        <span id="pgLabel">পৃষ্ঠা ১</span>
+        <button id="nextPg">›</button>
+      </div>
+
+      <!-- selected box settings -->
+      <div class="boxpanel hidden" id="boxPanel">
+        <div style="font-size:12.5px; color:var(--muted)">নির্বাচিত বক্সে কী বসবে</div>
+        <div class="seg" id="typeSeg">
+          <button data-t="white">সাদা</button>
+          <button data-t="logo">লোগো</button>
+          <button data-t="text">ইনফো</button>
+          <button data-t="both">লোগো+ইনফো</button>
+          <button data-t="custom">কাস্টম</button>
+        </div>
+        <div id="customWrap" class="hidden">
+          <label class="fld">এই বক্সের লেখা (যা ইচ্ছা)</label>
+          <textarea id="customText" rows="3" placeholder="এখানে নিজের লেখা টাইপ করুন…"></textarea>
+        </div>
+        <div style="font-size:12.5px; color:var(--muted); margin-top:9px">কোন পৃষ্ঠায়</div>
+        <div class="seg" id="pageSeg">
+          <button data-p="this">এই পৃষ্ঠা</button>
+          <button data-p="all">সব পৃষ্ঠা</button>
+        </div>
+        <div style="height:9px"></div>
+        <div class="row">
+          <button class="btn btn-primary" id="lockBoxBtn" style="flex:2">✓ বসান (লক)</button>
+          <button class="btn btn-ghost" id="dupBoxBtn" style="flex:1">⧉ নকল</button>
+          <button class="btn btn-danger" id="delBoxBtn" style="flex:1">🗑 মুছুন</button>
+        </div>
+      </div>
+
+      <div style="height:12px"></div>
+      <div class="hint" style="background:#fff3e0">প্রোফাইল সেভ = এই সোর্সের বক্স সাজানো টেমপ্লেট হিসেবে রাখা (পরের বার একই থাকবে)। PDF তৈরি = এই টিকেটের আউটপুট বানানো।</div>
+      <div class="row">
+        <button class="btn btn-ghost" id="saveProfileBtn">💾 প্রোফাইল সেভ</button>
+        <button class="btn btn-orange" id="generateBtn" style="flex:2">✨ নতুন PDF তৈরি করুন</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: ব্র্যান্ডিং -->
+  <div class="wrap tab hidden" id="tab-branding">
+    <div class="card">
+      <h3><span class="dot"></span> আমার ব্র্যান্ডিং</h3>
+      <div class="hint">টিকেটের বক্সে এই তথ্যগুলোই বসবে। যেকোনো সময় বদলাতে পারবেন।</div>
+      <label class="fld">কোম্পানির নাম</label>
+      <input type="text" id="bName" />
+      <label class="fld">ঠিকানা</label>
+      <input type="text" id="bAddr" />
+      <label class="fld">ইমেইল</label>
+      <input type="text" id="bEmail" />
+      <label class="fld">ফোন / হোয়াটসঅ্যাপ (ঐচ্ছিক)</label>
+      <input type="text" id="bPhone" />
+
+      <label class="fld">লোগো</label>
+      <input type="file" id="logoInput" accept="image/png,image/jpeg" style="display:none" />
+      <button class="btn btn-ghost btn-block" id="pickLogoBtn">🖼 লোগো আপলোড / বদল করুন</button>
+      <div class="logoprev hidden" id="logoPrev"><img id="logoImg" alt="logo" /></div>
+
+      <div style="height:14px"></div>
+      <button class="btn btn-primary btn-block" id="saveBrandBtn">💾 ব্র্যান্ডিং সেভ করুন</button>
+    </div>
+    <div class="card" id="logoutCard" style="display:none">
+      <button class="btn btn-danger btn-block" id="logoutBtn">লগআউট</button>
+    </div>
+  </div>
+
+  <!-- bottom nav -->
+  <div class="nav">
+    <button class="on" data-tab="rebrand"><span class="ic">🪪</span> রিব্র্যান্ড</button>
+    <button data-tab="branding"><span class="ic">🏷️</span> ব্র্যান্ডিং</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- আউটপুট প্রিভিউ -->
+<div class="pvmodal hidden" id="previewModal">
+  <div class="pvbox">
+    <div class="pvhead"><span>👁 আউটপুট প্রিভিউ</span><button id="pvClose">✕</button></div>
+    <div class="pvbody" id="pvBody"></div>
+    <div class="pvfoot">
+      <button class="btn btn-ghost" id="pvCancel" style="flex:1">বাতিল</button>
+      <button class="btn btn-orange" id="pvShare" style="flex:2">📤 শেয়ার / ডাউনলোড</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =================================================================
+   ইনসাফ টিকেট রিব্র্যান্ড — সিঙ্গেল ফাইল অ্যাপ
+   কাজ: সোর্স PDF-এর উপর সাদা বক্স বসিয়ে অন্য এজেন্টের লোগো/ইনফো ঢেকে
+        তার উপরে INSAF ব্র্যান্ডিং স্ট্যাম্প করা। আসল টিকেট তথ্য অপরিবর্তিত।
+   ================================================================= */
+
+function libsReady(){ return (typeof PDFLib!=="undefined") && (typeof pdfjsLib!=="undefined"); }
+function setupWorker(){
+  if(typeof pdfjsLib!=="undefined" && pdfjsLib.GlobalWorkerOptions){
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  }
+}
+/* in-memory fallback when localStorage is blocked (e.g. sandboxed preview) */
+const _mem = {};
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return (k in _mem)?_mem[k]:null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){ _mem[k]=v; } }
+
+const USE_FB = FIREBASE_CONFIG.apiKey && !FIREBASE_CONFIG.apiKey.includes("PASTE");
+let db=null, auth=null, uid="local";
+
+/* ---------- State ---------- */
+let branding = { name:"INSAF TRAVELS", addr:"443 Rong mahal tower, bandar bazar, sylhet",
+                 email:"info@insaftravelsbd.com", phone:"", logo:"" };
+let profiles = {};            // {id: {name, boxes:[...]}}
+let activeProfileId = null;
+let pdfBytes = null;          // Uint8Array of source pdf
+let pdfDoc = null;            // pdf.js doc
+let pageNum = 1, pageCount = 1;
+let renderW = 0, renderH = 0; // rendered canvas display size (css px)
+let selectedBoxIdx = -1;
+let sourceFileName = "ticket";
+let workingBoxes = [];        // editable copy of active profile's boxes (not saved until "প্রোফাইল সেভ")
+let logoAR = 1.6;             // logo width/height aspect ratio
+let zoom = 1;                 // preview zoom (1 = fit width)
+
+/* box: {id, page(int), all(bool), type, text?, locked?, x,y,w,h}  — x,y,w,h are 0..1 fractions */
+
+function deepCopy(o){ return JSON.parse(JSON.stringify(o||[])); }
+
+/* ---------- Undo ---------- */
+let _undoStack = [];
+function pushUndo(){
+  _undoStack.push(deepCopy(workingBoxes));
+  if(_undoStack.length>30) _undoStack.shift();
+  refreshUndoBtn();
+}
+function refreshUndoBtn(){ const b=$("undoBtn"); if(b) b.disabled = _undoStack.length===0; }
+function doUndo(){
+  if(_undoStack.length===0) return;
+  workingBoxes = _undoStack.pop();
+  selectedBoxIdx = -1; hideBoxPanel(); renderBoxes(); refreshUndoBtn();
+  toast("আগের অবস্থায় ফেরানো হলো");
+}
+function loadWorking(){
+  workingBoxes = (activeProfileId && profiles[activeProfileId])
+    ? deepCopy(profiles[activeProfileId].boxes||[]) : [];
+  selectedBoxIdx = -1;
+  _undoStack = []; refreshUndoBtn();
+}
+function computeLogoAR(){
+  if(!branding.logo) return;
+  const img=new Image();
+  img.onload=()=>{ if(img.naturalHeight>0){ logoAR = img.naturalWidth/img.naturalHeight; } };
+  img.src=branding.logo;
+}
+/* ---------- Helpers ---------- */
+const $ = id => document.getElementById(id);
+function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("show");
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),2200); }
+function uid4(){ return "b"+Math.random().toString(36).slice(2,8); }
+
+/* ---------- Storage layer (Firebase OR localStorage) ---------- */
+const LS = {
+  brand:"insaf_rebrand_branding",
+  profs:"insaf_rebrand_profiles"
+};
+async function loadBranding(){
+  if(USE_FB){
+    const d = await db.collection("rebrand").doc(uid).collection("meta").doc("branding").get();
+    if(d.exists) branding = Object.assign(branding, d.data());
+  } else {
+    const r = lsGet(LS.brand);
+    if(r) branding = Object.assign(branding, JSON.parse(r));
+  }
+}
+async function saveBranding(){
+  if(USE_FB){
+    await db.collection("rebrand").doc(uid).collection("meta").doc("branding").set(branding);
+  } else {
+    lsSet(LS.brand, JSON.stringify(branding));
+  }
+}
+async function loadProfiles(){
+  if(USE_FB){
+    const snap = await db.collection("rebrand").doc(uid).collection("profiles").get();
+    profiles = {}; snap.forEach(doc => profiles[doc.id] = doc.data());
+  } else {
+    const r = lsGet(LS.profs);
+    profiles = r ? JSON.parse(r) : {};
+  }
+}
+async function persistProfile(id){
+  if(USE_FB){
+    await db.collection("rebrand").doc(uid).collection("profiles").doc(id).set(profiles[id]);
+  } else {
+    lsSet(LS.profs, JSON.stringify(profiles));
+  }
+}
+async function removeProfile(id){
+  delete profiles[id];
+  if(USE_FB){
+    await db.collection("rebrand").doc(uid).collection("profiles").doc(id).delete();
+  } else {
+    lsSet(LS.profs, JSON.stringify(profiles));
+  }
+}
+
+/* ---------- Init ---------- */
+async function boot(){
+ try{
+  if(USE_FB){
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore(); auth = firebase.auth();
+    $("modeChip").textContent = "ক্লাউড সিঙ্ক";
+    $("logoutCard").style.display = "block";
+    auth.onAuthStateChanged(async u=>{
+      if(u){ uid=u.uid; $("authScreen").classList.add("hidden");
+             $("app").classList.remove("hidden"); await afterAuth(); }
+      else { $("app").classList.add("hidden"); $("authScreen").classList.remove("hidden");
+             $("splash").classList.add("hidden"); }
+    });
+  } else {
+    setupWorker();
+    $("app").classList.remove("hidden");
+    await afterAuth();
+  }
+ }catch(e){
+   console.error("boot error", e);
+   $("splash").classList.add("hidden");
+   $("app").classList.remove("hidden");
+   toast("চালু হলো, তবে একটি সমস্যা ছিল");
+ }
+}
+async function afterAuth(){
+  try{
+    setupWorker();
+    await loadBranding();
+    await loadProfiles();
+  }catch(e){ console.error(e); toast("ডেটা লোডে সমস্যা — তবু চালু থাকবে"); }
+  fillBrandingForm();
+  computeLogoAR();
+  refreshProfileSelect();
+  loadWorking();
+  $("splash").classList.add("hidden");
+  if(!libsReady()){
+    toast("PDF লাইব্রেরি লোড হয়নি — ইন্টারনেট সংযোগ দরকার");
+  }
+}
+
+/* ---------- Auth handlers ---------- */
+$("loginBtn") && ($("loginBtn").onclick = async ()=>{
+  try{
+    await auth.signInWithEmailAndPassword($("authEmail").value.trim(), $("authPass").value);
+  }catch(e){
+    const m=$("authMsg"); m.style.display="block";
+    m.textContent = "লগইন ব্যর্থ: "+ (e.code||e.message);
+  }
+});
+$("logoutBtn") && ($("logoutBtn").onclick = ()=> auth.signOut());
+
+/* ---------- Branding form ---------- */
+function fillBrandingForm(){
+  $("bName").value=branding.name||""; $("bAddr").value=branding.addr||"";
+  $("bEmail").value=branding.email||""; $("bPhone").value=branding.phone||"";
+  if(branding.logo){ $("logoImg").src=branding.logo; $("logoPrev").classList.remove("hidden"); }
+}
+$("pickLogoBtn").onclick = ()=> $("logoInput").click();
+$("logoInput").onchange = e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload = ()=>{ branding.logo=r.result; $("logoImg").src=r.result; computeLogoAR();
+    $("logoPrev").classList.remove("hidden"); toast("লোগো যুক্ত হলো — সেভ করতে ভুলবেন না"); };
+  r.readAsDataURL(f);
+};
+$("saveBrandBtn").onclick = async ()=>{
+  branding.name=$("bName").value.trim(); branding.addr=$("bAddr").value.trim();
+  branding.email=$("bEmail").value.trim(); branding.phone=$("bPhone").value.trim();
+  await saveBranding(); renderBoxes(); toast("ব্র্যান্ডিং সেভ হলো ✓");
+};
+
+/* ---------- Profiles ---------- */
+function refreshProfileSelect(){
+  const sel=$("profileSelect"); sel.innerHTML="";
+  const ids=Object.keys(profiles);
+  if(ids.length===0){
+    const o=document.createElement("option"); o.value=""; o.textContent="— কোনো প্রোফাইল নেই, + নতুন চাপুন —";
+    sel.appendChild(o); activeProfileId=null;
+  } else {
+    ids.forEach(id=>{ const o=document.createElement("option");
+      o.value=id; o.textContent=profiles[id].name+" ("+profiles[id].boxes.length+" বক্স)";
+      sel.appendChild(o); });
+    if(!activeProfileId || !profiles[activeProfileId]) activeProfileId=ids[0];
+    sel.value=activeProfileId;
+  }
+  const pa=$("profileActions"); if(pa) pa.style.display = Object.keys(profiles).length ? "flex" : "none";
+  if(pdfDoc) renderBoxes();
+}
+$("profileSelect").onchange = e=>{ activeProfileId=e.target.value; selectedBoxIdx=-1;
+  loadWorking(); hideBoxPanel(); renderBoxes(); };
+$("newProfileBtn").onclick = async ()=>{
+  const nm = prompt("নতুন সোর্সের নাম (যেমন: S.A FLY INTERNATIONAL)");
+  if(!nm) return;
+  const id=uid4(); profiles[id]={name:nm.trim(), boxes:[]}; activeProfileId=id;
+  await persistProfile(id); refreshProfileSelect(); loadWorking(); renderBoxes();
+  toast("প্রোফাইল তৈরি হলো");
+};
+$("saveProfileBtn").onclick = async ()=>{
+  if(!activeProfileId){ toast("আগে একটা প্রোফাইল বানান/বাছুন"); return; }
+  profiles[activeProfileId].boxes = deepCopy(workingBoxes);   // commit working → template
+  await persistProfile(activeProfileId); refreshProfileSelect();
+  toast("প্রোফাইল সেভ হলো ✓ (টেমপ্লেট আপডেট)");
+};
+$("renameProfileBtn").onclick = async ()=>{
+  if(!activeProfileId || !profiles[activeProfileId]){ toast("আগে একটা প্রোফাইল বাছুন"); return; }
+  const nm = prompt("নতুন নাম দিন", profiles[activeProfileId].name||"");
+  if(nm===null) return;
+  const t=nm.trim(); if(!t){ toast("নাম খালি রাখা যাবে না"); return; }
+  profiles[activeProfileId].name = t;
+  await persistProfile(activeProfileId); refreshProfileSelect();
+  toast("নাম বদলে গেল ✓");
+};
+$("delProfileBtn").onclick = async ()=>{
+  if(!activeProfileId || !profiles[activeProfileId]){ toast("আগে একটা প্রোফাইল বাছুন"); return; }
+  if(!confirm("\""+profiles[activeProfileId].name+"\" প্রোফাইলটি মুছে ফেলবেন? এর সব বক্স টেমপ্লেট চলে যাবে।")) return;
+  await removeProfile(activeProfileId);
+  activeProfileId = Object.keys(profiles)[0] || null;
+  loadWorking(); hideBoxPanel(); refreshProfileSelect(); renderBoxes();
+  toast("প্রোফাইল মুছে ফেলা হলো");
+};
+
+/* ---------- PDF load & render ---------- */
+$("pickPdfBtn").onclick = ()=> $("pdfInput").click();
+$("pdfInput").onchange = async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  if(!libsReady()){ toast("PDF লাইব্রেরি লোড হয়নি — ইন্টারনেট সংযোগ দরকার"); return; }
+  setupWorker();
+  sourceFileName = f.name.replace(/\.pdf$/i,"") || "ticket";
+  $("fileName").style.display="block"; $("fileName").textContent="📄 "+f.name;
+  const buf = await f.arrayBuffer();
+  pdfBytes = new Uint8Array(buf);
+  // pdf.js consumes the buffer; keep a separate copy for pdf-lib
+  pdfDoc = await pdfjsLib.getDocument({data: pdfBytes.slice()}).promise;
+  pageCount = pdfDoc.numPages; pageNum=1;
+  $("editorCard").classList.remove("hidden");
+  $("pageBar").style.display = pageCount>1 ? "flex" : "none";
+  selectedBoxIdx=-1; hideBoxPanel();
+  await renderPage();
+};
+$("prevPg").onclick = async ()=>{ if(pageNum>1){pageNum--; selectedBoxIdx=-1; hideBoxPanel(); await renderPage();} };
+$("nextPg").onclick = async ()=>{ if(pageNum<pageCount){pageNum++; selectedBoxIdx=-1; hideBoxPanel(); await renderPage();} };
+
+function setZoom(z){
+  zoom = Math.max(1, Math.min(4, Math.round(z*10)/10));
+  $("zoomLbl").textContent = toBn(Math.round(zoom*100))+"%";
+  if(pdfDoc) renderPage();
+}
+$("zoomIn").onclick  = ()=> setZoom(zoom+0.5);
+$("zoomOut").onclick = ()=> setZoom(zoom-0.5);
+$("zoomReset").onclick = ()=> setZoom(1);
+
+async function renderPage(){
+  const page = await pdfDoc.getPage(pageNum);
+  const wrapW = $("previewWrap").clientWidth || 320;
+  const baseVp = page.getViewport({scale:1});
+  const scale = (wrapW / baseVp.width) * zoom;
+  const vp = page.getViewport({scale});
+  const canvas=$("pdfCanvas"), ctx=canvas.getContext("2d");
+  const dpr = window.devicePixelRatio||1;
+  canvas.width = vp.width*dpr; canvas.height=vp.height*dpr;
+  canvas.style.width=vp.width+"px"; canvas.style.height=vp.height+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  await page.render({canvasContext:ctx, viewport:vp}).promise;
+  renderW=vp.width; renderH=vp.height;
+  $("overlay").style.width=vp.width+"px"; $("overlay").style.height=vp.height+"px";
+  $("pgLabel").textContent = "পৃষ্ঠা "+toBn(pageNum)+" / "+toBn(pageCount);
+  renderBoxes();
+}
+function toBn(n){ const d="০১২৩৪৫৬৭৮৯"; return String(n).replace(/\d/g,x=>d[x]); }
+
+/* ---------- Box overlay rendering ---------- */
+function currentBoxes(){ return workingBoxes; }
+function boxesOnThisPage(){
+  return currentBoxes().map((b,i)=>({b,i})).filter(o=> o.b.all || o.b.page===pageNum );
+}
+const TYPE_LABEL = {white:"সাদা", logo:"লোগো", text:"ইনফো", both:"লোগো+ইনফো", custom:"কাস্টম"};
+
+/* lines that go into a box */
+function boxLines(b){
+  if(b.type==="custom"){
+    return (b.text||"").split(/\n/).map(t=>({t, bold:false})).filter(l=>l.t.trim()!=="");
+  }
+  const out=[];
+  if(branding.name)  out.push({t:branding.name,  bold:true});
+  if(branding.addr)  out.push({t:branding.addr,  bold:false});
+  if(branding.email) out.push({t:branding.email, bold:false});
+  if(branding.phone) out.push({t:branding.phone, bold:false});
+  return out;
+}
+/* render text lines to a natural-size PNG, cached; it is then stretched to fill
+   its box region — so text scales freely exactly like the logo image */
+const _txtCache = {};
+function _txtKey(lines){ return lines.map(l=>(l.bold?"B:":"N:")+l.t).join("|"); }
+function buildTextImage(lines){
+  if(lines.length===0) lines=[{t:" ",bold:false}];
+  const key=_txtKey(lines);
+  if(_txtCache[key]) return _txtCache[key];
+  const base=42, nameF=50, gap=12, padX=22, padY=16;
+  const meas=document.createElement("canvas").getContext("2d");
+  const fontOf=(l)=> (l.bold?"700 ":"400 ")+(l.bold?nameF:base)+"px Arial,Helvetica,sans-serif";
+  let maxW=10;
+  lines.forEach(l=>{ meas.font=fontOf(l); maxW=Math.max(maxW, meas.measureText(l.t).width); });
+  const W=Math.ceil(maxW+2*padX);
+  let H=padY*2; lines.forEach(l=> H+=(l.bold?nameF:base)+gap); H=Math.ceil(H-gap);
+  const cv=document.createElement("canvas"); cv.width=W; cv.height=H;
+  const cx=cv.getContext("2d"); cx.textBaseline="top";
+  let y=padY;
+  lines.forEach(l=>{ cx.font=fontOf(l); cx.fillStyle=l.bold?"#0b2545":"#4d5560";
+    cx.fillText(l.t, padX, y); y+=(l.bold?nameF:base)+gap; });
+  const url=cv.toDataURL("image/png"); _txtCache[key]=url; return url;
+}
+/* content regions inside a box (fractions of the box) */
+function boxRegions(b){
+  if(b.type==="white") return [];
+  if(b.type==="logo")  return [{kind:"logo", fit:"fill", x:0,y:0,w:1,h:1}];
+  if(b.type==="text")  return [{kind:"text", x:0,y:0,w:1,h:1}];
+  if(b.type==="custom")return [{kind:"text", x:0,y:0,w:1,h:1}];
+  // both
+  return [{kind:"text", x:0,y:0,w:0.64,h:1}, {kind:"logo", fit:"contain", x:0.66,y:0,w:0.34,h:1}];
+}
+
+function renderBoxes(){
+  const ov=$("overlay"); ov.innerHTML="";
+  if(!renderW) return;
+  boxesOnThisPage().forEach(({b,i})=>{
+    const bw=b.w*renderW, bh=b.h*renderH;
+    const el=document.createElement("div");
+    el.className="rbox"+(i===selectedBoxIdx?" sel":"")+(b.locked?" locked":"");
+    el.style.left=(b.x*renderW)+"px"; el.style.top=(b.y*renderH)+"px";
+    el.style.width=bw+"px"; el.style.height=bh+"px";
+    el.dataset.idx=i;
+    const tag=document.createElement("div"); tag.className="tag";
+    tag.textContent=(b.locked?"🔒 ":"")+TYPE_LABEL[b.type]+(b.all?" · সব":""); el.appendChild(tag);
+
+    boxRegions(b).forEach(rg=>{
+      const rw=rg.w*bw, rh=rg.h*bh;
+      if(rg.kind==="text"){
+        const lines=boxLines(b);
+        const img=document.createElement("img");
+        img.style.position="absolute"; img.style.pointerEvents="none";
+        img.style.left=(rg.x*bw)+"px"; img.style.top=(rg.y*bh)+"px";
+        img.style.width=rw+"px"; img.style.height=rh+"px";
+        img.style.objectFit="contain"; img.style.objectPosition="left top";
+        if(lines.length===0){
+          img.src = buildTextImage([{t:(b.type==="custom"?"টেক্সট লিখুন…":"ইনফো নেই"),bold:false}]);
+        } else {
+          img.src = buildTextImage(lines);
+        }
+        el.appendChild(img);
+      } else if(rg.kind==="logo" && branding.logo){
+        const im=document.createElement("img"); im.src=branding.logo;
+        im.style.position="absolute"; im.style.pointerEvents="none";
+        im.style.left=(rg.x*bw)+"px"; im.style.top=(rg.y*bh)+"px";
+        im.style.width=rw+"px"; im.style.height=rh+"px";
+        im.style.objectFit = (rg.fit==="contain") ? "contain" : "fill";
+        el.appendChild(im);
+      }
+    });
+
+    if(!b.locked){
+      const del=document.createElement("div"); del.className="del"; del.textContent="×"; el.appendChild(del);
+      const hbr=document.createElement("div"); hbr.className="hdl br"; el.appendChild(hbr);
+      const htl=document.createElement("div"); htl.className="hdl tl"; el.appendChild(htl);
+    }
+    ov.appendChild(el);
+  });
+}
+function esc(s){ return (s||"").replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+
+/* ---------- Pointer: draw / move / resize ---------- */
+let mode=null, startX=0, startY=0, draftEl=null, activeIdx=-1, originBox=null, resizeCorner="br";
+let _dragSnapshot=null, _dragChanged=false;
+const ov = $("overlay");
+
+ov.addEventListener("pointerdown", e=>{
+  if(!activeProfileId){ toast("আগে একটা প্রোফাইল বানান/বাছুন"); return; }
+  if(!renderW) return;
+  const rect=ov.getBoundingClientRect();
+  const px=e.clientX-rect.left, py=e.clientY-rect.top;
+  const target=e.target;
+
+  // delete button
+  if(target.classList.contains("del")){
+    const idx=+target.parentElement.dataset.idx;
+    pushUndo();
+    currentBoxes().splice(idx,1); selectedBoxIdx=-1;
+    hideBoxPanel(); renderBoxes();
+    return;
+  }
+  if(target.classList.contains("hdl")){            // resize from a corner
+    _dragSnapshot=deepCopy(workingBoxes); _dragChanged=false;
+    mode="resize"; resizeCorner = target.classList.contains("tl") ? "tl" : "br";
+    activeIdx=+target.parentElement.dataset.idx;
+    selectedBoxIdx=activeIdx; originBox={...currentBoxes()[activeIdx]};
+    startX=px; startY=py; ov.setPointerCapture(e.pointerId); renderBoxes(); showBoxPanel(); return;
+  }
+  if(target.classList.contains("rbox") || target.parentElement?.classList.contains("rbox")){ // move/select
+    const boxEl = target.classList.contains("rbox")? target : target.parentElement;
+    const idx=+boxEl.dataset.idx; selectedBoxIdx=idx;
+    if(currentBoxes()[idx].locked){   // locked: just select & show panel, no move
+      renderBoxes(); showBoxPanel(); return;
+    }
+    _dragSnapshot=deepCopy(workingBoxes); _dragChanged=false;
+    mode="move"; activeIdx=idx;
+    originBox={...currentBoxes()[idx]}; startX=px; startY=py;
+    ov.setPointerCapture(e.pointerId); renderBoxes(); showBoxPanel(); return;
+  }
+  // empty area: do nothing → let the page scroll normally
+});
+ov.addEventListener("pointermove", e=>{
+  if(!mode) return;
+  _dragChanged=true;
+  const rect=ov.getBoundingClientRect();
+  let px=e.clientX-rect.left, py=e.clientY-rect.top;
+  px=Math.max(0,Math.min(renderW,px)); py=Math.max(0,Math.min(renderH,py));
+  if(mode==="move"){
+    const dx=(px-startX)/renderW, dy=(py-startY)/renderH;
+    const b=currentBoxes()[activeIdx];
+    b.x=clamp01(originBox.x+dx, originBox.w); b.y=clamp01(originBox.y+dy, originBox.h);
+    renderBoxes();
+  } else if(mode==="resize"){
+    const b=currentBoxes()[activeIdx];
+    const dx=(px-startX)/renderW, dy=(py-startY)/renderH;
+    const MINW=0.02, MINH=0.01;
+    let nx=originBox.x, ny=originBox.y, nw=originBox.w, nh=originBox.h;
+    if(resizeCorner==="br"){
+      nw=originBox.w+dx; nh=originBox.h+dy;
+    } else { // tl
+      nx=originBox.x+dx; ny=originBox.y+dy;
+      nw=originBox.w-dx; nh=originBox.h-dy;
+    }
+    if(nw<MINW){ if(resizeCorner==="tl") nx=originBox.x+originBox.w-MINW; nw=MINW; }
+    if(nh<MINH){ if(resizeCorner==="tl") ny=originBox.y+originBox.h-MINH; nh=MINH; }
+    nx=Math.max(0,nx); ny=Math.max(0,ny);
+    nw=Math.min(nw,1-nx); nh=Math.min(nh,1-ny);
+    b.x=nx; b.y=ny; b.w=nw; b.h=nh;
+    renderBoxes();
+  }
+});
+function clamp01(v, size){ return Math.max(0, Math.min(1-size, v)); }
+
+ov.onpointerup = function(e){
+  if(_dragSnapshot && _dragChanged){
+    _undoStack.push(_dragSnapshot);
+    if(_undoStack.length>30) _undoStack.shift();
+    refreshUndoBtn();
+  }
+  _dragSnapshot=null; _dragChanged=false;
+  mode=null; activeIdx=-1;   // changes live in workingBoxes; commit via "প্রোফাইল সেভ"
+};
+
+/* ---------- Add box via buttons (sized to content) ---------- */
+function defaultSizeFor(type){
+  // returns {w,h} as page fractions, sized to the content so there's no extra space
+  const ar = (renderW&&renderH) ? (renderH/renderW) : 1.4;  // page height/width ratio in px
+  if(type==="logo"){
+    const h=0.05;                      // 5% of page height
+    let w = h * logoAR * ar;           // keep logo's real aspect on the page
+    w = Math.max(0.05, Math.min(0.45, w));
+    return {w, h};
+  }
+  if(type==="both") return {w:0.52, h:0.085};
+  if(type==="custom") return {w:0.40, h:0.045};
+  // text (branding info): 4 short lines
+  return {w:0.45, h:0.08};
+}
+function addBox(type){
+  if(!activeProfileId){ toast("আগে একটা প্রোফাইল বানান/বাছুন"); return; }
+  if(!pdfDoc){ toast("আগে PDF আপলোড করুন"); return; }
+  const s=defaultSizeFor(type);
+  const nb={ id:uid4(), page:pageNum, all:false, type:type, locked:false,
+    x:0.08, y:0.06, w:s.w, h:s.h };
+  if(type==="custom") nb.text="";
+  pushUndo();
+  workingBoxes.push(nb);
+  selectedBoxIdx = workingBoxes.length-1;
+  renderBoxes(); showBoxPanel();
+  $("boxPanel").scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+$("addBoxBtn").onclick  = ()=> addBox("both");
+$("addTextBtn").onclick = ()=> addBox("custom");
+
+/* ---------- Box settings panel ---------- */
+function showBoxPanel(){
+  const b=currentBoxes()[selectedBoxIdx]; if(!b){ hideBoxPanel(); return; }
+  $("boxPanel").classList.remove("hidden");
+  [...$("typeSeg").children].forEach(btn=> btn.classList.toggle("on", btn.dataset.t===b.type));
+  [...$("pageSeg").children].forEach(btn=> btn.classList.toggle("on",
+      (btn.dataset.p==="all")===!!b.all));
+  if(b.type==="custom"){
+    $("customWrap").classList.remove("hidden");
+    $("customText").value = b.text||"";
+  } else {
+    $("customWrap").classList.add("hidden");
+  }
+  $("lockBoxBtn").textContent = b.locked ? "✏️ আবার এডিট" : "✓ বসান (লক)";
+}
+function hideBoxPanel(){ $("boxPanel").classList.add("hidden"); }
+$("lockBoxBtn").onclick = ()=>{
+  const b=currentBoxes()[selectedBoxIdx]; if(!b) return;
+  b.locked = !b.locked; renderBoxes(); showBoxPanel();
+  toast(b.locked ? "বক্স লক হলো — জায়গায় বসে থাকবে" : "এডিট চালু");
+};
+$("customText").oninput = e=>{
+  const b=currentBoxes()[selectedBoxIdx]; if(!b||b.type!=="custom") return;
+  b.text=e.target.value; renderBoxes();
+};
+$("typeSeg").onclick = e=>{
+  const t=e.target.dataset.t; if(!t) return;
+  const b=currentBoxes()[selectedBoxIdx]; if(!b) return;
+  b.type=t;
+  const s=defaultSizeFor(t); b.w=s.w; b.h=s.h;   // re-fit to new content type
+  showBoxPanel(); renderBoxes();
+};
+$("pageSeg").onclick = e=>{
+  const p=e.target.dataset.p; if(!p) return;
+  const b=currentBoxes()[selectedBoxIdx]; if(!b) return;
+  b.all = (p==="all"); if(!b.all) b.page=pageNum;
+  showBoxPanel(); renderBoxes();
+};
+$("undoBtn").onclick = ()=> doUndo();
+$("dupBoxBtn").onclick = ()=>{
+  const b=currentBoxes()[selectedBoxIdx]; if(!b){ toast("আগে একটা বক্স বাছুন"); return; }
+  pushUndo();
+  const nb=deepCopy([b])[0];
+  nb.id=uid4(); nb.locked=false;
+  nb.x=clamp01(b.x+0.03, b.w); nb.y=clamp01(b.y+0.03, b.h);  // slight offset
+  workingBoxes.push(nb);
+  selectedBoxIdx=workingBoxes.length-1;
+  renderBoxes(); showBoxPanel();
+  toast("বক্স নকল হলো");
+};
+$("delBoxBtn").onclick = ()=>{
+  if(selectedBoxIdx<0) return;
+  pushUndo();
+  currentBoxes().splice(selectedBoxIdx,1); selectedBoxIdx=-1;
+  hideBoxPanel(); renderBoxes();
+};
+
+/* ---------- GENERATE: stamp branding onto PDF (pdf-lib) ---------- */
+let _outBytes=null, _outName="ticket-insaf.pdf";
+$("generateBtn").onclick = async ()=>{
+  if(!pdfBytes){ toast("আগে PDF আপলোড করুন"); return; }
+  if(!libsReady()){ toast("PDF লাইব্রেরি লোড হয়নি — ইন্টারনেট দরকার"); return; }
+  if(!activeProfileId || currentBoxes().length===0){ toast("অন্তত একটা বক্স আঁকুন"); return; }
+  $("generateBtn").disabled=true; $("generateBtn").textContent="তৈরি হচ্ছে…";
+  try{
+    _outBytes = await buildPdf();
+    _outName = sourceFileName+"-insaf.pdf";
+    await openPreview(_outBytes);
+  }catch(err){
+    console.error(err); toast("সমস্যা: "+(err.message||err));
+  }finally{
+    $("generateBtn").disabled=false; $("generateBtn").textContent="✨ নতুন PDF তৈরি করুন";
+  }
+};
+
+/* render generated PDF into the preview modal (all pages) */
+async function openPreview(bytes){
+  const body=$("pvBody"); body.innerHTML="";
+  const doc = await pdfjsLib.getDocument({data: bytes.slice()}).promise;
+  const maxW = Math.min(window.innerWidth-52, 480);
+  for(let p=1; p<=doc.numPages; p++){
+    const page = await doc.getPage(p);
+    const base = page.getViewport({scale:1});
+    const vp = page.getViewport({scale: maxW/base.width});
+    const cv=document.createElement("canvas");
+    const dpr=window.devicePixelRatio||1;
+    cv.width=vp.width*dpr; cv.height=vp.height*dpr;
+    cv.style.width=vp.width+"px"; cv.style.height=vp.height+"px";
+    const cx=cv.getContext("2d"); cx.setTransform(dpr,0,0,dpr,0,0);
+    await page.render({canvasContext:cx, viewport:vp}).promise;
+    body.appendChild(cv);
+  }
+  $("previewModal").classList.remove("hidden");
+}
+function closePreview(){ $("previewModal").classList.add("hidden"); $("pvBody").innerHTML=""; }
+$("pvClose").onclick = closePreview;
+$("pvCancel").onclick = closePreview;
+$("pvShare").onclick = async ()=>{
+  if(!_outBytes) return;
+  const blob = new Blob([_outBytes], {type:"application/pdf"});
+  const file = new File([blob], _outName, {type:"application/pdf"});
+  closePreview();
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file], title:_outName}); }
+    catch(_){ downloadBlob(blob,_outName); }
+  } else {
+    downloadBlob(blob,_outName);
+  }
+  toast("নতুন PDF তৈরি ✓");
+};
+function downloadBlob(blob,name){
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+}
+
+async function buildPdf(){
+  const { PDFDocument, rgb } = PDFLib;
+  const doc = await PDFDocument.load(pdfBytes.slice());
+  const pages = doc.getPages();
+
+  // embed logo once
+  let logoImg=null, logoAR2=1;
+  if(branding.logo){
+    const m=branding.logo.match(/^data:(image\/\w+);base64,(.*)$/);
+    if(m){
+      const bytes=Uint8Array.from(atob(m[2]), c=>c.charCodeAt(0));
+      logoImg = (m[1]==="image/png") ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
+      logoAR2 = logoImg.width/logoImg.height;
+    }
+  }
+  // cache embedded text images by signature (dataURL)
+  const textCache = {};
+  async function embedTextPng(dataURL){
+    if(textCache[dataURL]) return textCache[dataURL];
+    const b64=dataURL.split(",")[1];
+    const bytes=Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
+    const img=await doc.embedPng(bytes); textCache[dataURL]=img; return img;
+  }
+
+  for(const b of currentBoxes()){
+    const targets = b.all ? pages.map((_,i)=>i) : [b.page-1];
+    for(const pi of targets){
+      const page = pages[pi]; if(!page) continue;
+      const pw=page.getWidth(), ph=page.getHeight();
+      const bx=b.x*pw, bw=b.w*pw, bh=b.h*ph;
+      const topY = ph - b.y*ph;            // top edge (pdf coords from bottom)
+      const bottomY = topY - bh;
+      const bleed=1;
+      // white cover
+      page.drawRectangle({ x:bx-bleed, y:bottomY-bleed, width:bw+2*bleed, height:bh+2*bleed,
+        color: rgb(1,1,1) });
+
+      for(const rg of boxRegions(b)){
+        const rw=rg.w*bw, rh=rg.h*bh;
+        const rx=bx+rg.x*bw;
+        const ryTop=topY - rg.y*bh;        // region top in pdf coords
+        const ryBottom=ryTop - rh;
+        if(rg.kind==="text"){
+          const lines=boxLines(b);
+          if(lines.length===0) continue;
+          const dataURL=buildTextImage(lines);
+          const img=await embedTextPng(dataURL);
+          // contain + top-left so text keeps its natural aspect (no stretch)
+          const sc=Math.min(rw/img.width, rh/img.height);
+          const dw=img.width*sc, dh=img.height*sc;
+          page.drawImage(img,{x:rx, y:ryTop-dh, width:dw, height:dh});
+        } else if(rg.kind==="logo" && logoImg){
+          if(rg.fit==="contain"){
+            const sc=Math.min(rw/logoImg.width, rh/logoImg.height);
+            const dw=logoImg.width*sc, dh=logoImg.height*sc;
+            page.drawImage(logoImg,{x:rx+(rw-dw)/2, y:ryBottom+(rh-dh)/2, width:dw, height:dh});
+          } else { // fill
+            page.drawImage(logoImg,{x:rx, y:ryBottom, width:rw, height:rh});
+          }
+        }
+      }
+    }
+  }
+  return await doc.save();
+}
+
+/* ---------- Tabs ---------- */
+document.querySelectorAll(".nav button").forEach(btn=>{
+  btn.onclick = ()=>{
+    document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("on"));
+    btn.classList.add("on");
+    document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
+    $("tab-"+btn.dataset.tab).classList.remove("hidden");
+  };
+});
+
+/* re-render preview on resize/orientation */
+let rT; window.addEventListener("resize", ()=>{ clearTimeout(rT);
+  rT=setTimeout(()=>{ if(pdfDoc) renderPage(); },250); });
+
+boot();
+
+/* ---------- PWA: সার্ভিস ওয়ার্কার রেজিস্টার ---------- */
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("sw.js").catch(e=>console.warn("SW reg failed", e));
+  });
+}
+</script>
+</body>
+</html>
