@@ -1,6 +1,6 @@
 /* ইনসাফ টিকেট রিব্র্যান্ড — সার্ভিস ওয়ার্কার
    প্রতিবার ডিপ্লয়ে CACHE_NAME বাড়াবেন (v1 → v2) যাতে সব ডিভাইসে পুরোনো ক্যাশ মুছে যায়। */
-const CACHE_NAME = "insaf-rebrand-v3";
+const CACHE_NAME = "insaf-rebrand-v4";
 
 const APP_SHELL = [
   "./",
